@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 #include <ranges>
-#include <math.h>
+#include <cmath>
 
 class Solution
 {
