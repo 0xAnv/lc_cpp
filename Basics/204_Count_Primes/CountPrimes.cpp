@@ -6,6 +6,7 @@
 #include <iostream>
 #include <vector>
 #include <ranges>
+#include <math.h>
 
 class Solution
 {
@@ -64,7 +65,27 @@ public:
         }
         return count;
     }
-    static int count_primes_optimised_cpp20(int n);
+    static constexpr int count_primes_optimised_cpp20(int n)
+    {
+        if (n <= 2) return 0;
+        std::vector<char> is_prime(n, 1);
+        int count = n/2;
+
+        for (long long p = 3; p*p < n; p += 2)
+        {
+            if (is_prime[p])
+            {
+                for (long long i = p*p; i<n; i+= 2*p)
+                {
+                    if (is_prime[i])
+                    {
+                        is_prime[i] = 0; count--;
+                    }
+                }
+            }
+        }
+        return count;
+    }
 
 private:
     // extremely optimised bruteforce primality test (6k +/- 1 rule)
@@ -78,6 +99,57 @@ private:
     }
 };
 
+// LC 7 ms solution
+using namespace  std;
+class SolutionLC {
+public:
+    using ll = long long;
+    static ll count_primes(ll n) {
+        vector<ll> v;
+        for (ll k = 1; k * k <= n; ++k) {
+            v.push_back(n / k);
+            v.push_back(k);
+        }
+        sort(v.begin(), v.end());
+        v.erase(unique(v.begin(), v.end()), v.end());
+
+        // return i such that v[i] = x
+        // since v[i] = i + 1 for i <= sqrt(n) and v[v.size() - i] = n / i for i <= sqrt(n),
+        // we can calculate index in O(1)
+        ll sq = sqrt(n);
+        auto geti = [&](ll x) {
+            if (x <= sq) return (int)x - 1;
+            else         return (int)(v.size() - (n / x));
+        };
+
+        vector<ll> dp(v.size());
+
+        // S(n, 0) = n
+        for (int i = 0; i < v.size(); ++i)
+            dp[i] = v[i];
+
+        int a = 0;
+        for (ll p = 2; p * p <= n; ++p) {
+            // this condition is true for primes
+            if (dp[geti(p)] != dp[geti(p - 1)]) {
+                ++a;
+                for (int i = (int)v.size() - 1; i >= 0; --i) {
+                    if (v[i] < p * p) break;
+                    dp[i] -= dp[geti(v[i] / p)] - a;
+                }
+            }
+        }
+
+        return dp[geti(n)] - 1;
+    }
+
+    int countPrimes(int n) {
+        if (n <= 2) return 0;
+        return count_primes((ll)n-1);
+    }
+};
+
+
 int main()
 {
     // Example
@@ -89,6 +161,24 @@ int main()
         std::cout<<"n: " <<x<<"; "<<"BruteforceCPP17: "<< Solution::count_primes_bruteforce_cpp17(x) << std::endl;
         std::cout<<"n: " <<x<<"; "<<"BruteforceCPP20: "<< Solution::count_primes_bruteforce_cpp20(x) << std::endl;
         std::cout<<"n: " <<x<<"; "<<"OptimisedCPP17: "<< Solution::count_primes_optimised_cpp17(x) << std::endl;
+        std::cout<<"n: " <<x<<"; "<<"OptimisedCPP20: "<< Solution::count_primes_optimised_cpp20(x) << std::endl;
         std::cout << "---------" << std::endl;
     });
+
+    // const int p = 50000000;
+    // std::cout << p << std::endl;
+    // std::cout << Solution::count_primes_optimised_cpp17(p) << std::endl;
+    // constexpr int ans = Solution::count_primes_optimised_cpp20(p);
+    // std::cout << ans << std::endl;
+
+    long long l = 500000000ll;
+    constexpr int li = 500000000;
+    int li2 = 500000000;
+
+    cout<< SolutionLC::count_primes(l)<<endl;
+    cout<<li<<endl;
+    const int sol = Solution::count_primes_optimised_cpp20(li);
+    cout<<sol<<endl;
+    cout<<li2<<endl;
+    cout << Solution::count_primes_optimised_cpp17(li2)<<endl;
 }
