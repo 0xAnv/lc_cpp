@@ -41,7 +41,7 @@ public:
      * Approach 2: Sieve of Eratosthenes
      *
      */
-    static int count_primes_optimised_cpp17(int n)
+    static int count_primes_optimised_cpp17(int n)// 65ms
     {
         if (n <= 2) return 0;
         // c++ std::vector<bool> is space-optimised bitset; packs 8 booleans into single byte
@@ -65,7 +65,7 @@ public:
         }
         return count;
     }
-    static constexpr int count_primes_optimised_cpp20(int n)
+    static constexpr int count_primes_optimised_cpp20(int n) // 62 ms
     {
         if (n <= 2) return 0;
         std::vector<char> is_prime(n, 1);
@@ -149,36 +149,147 @@ public:
     }
 };
 
+// estimates sub millisecond 0-1 ms (will test it!)
+class SolutionLC_cpp23
+{
+public:
+    static int countPrimes(int n)
+    {
+        // base case; lc expects strictly less than n
+        if (n <= 2) return 0;
+        n = n-1;
+        const int sq = std::sqrt(n);
+
+        // we eliminate the dynamically sized vector, std::sort and std::unique.
+        // instead we allocate exactly two perfectly contiguous arrays.
+        // size for N=5_000_000 is ~2237 ints. Takes ~8KB memory total.
+        std::vector<int> small(sq + 1),large(sq + 1); // tracks primes <= n / i
+
+        // initialise our states; assums all nums >= 2 are primes
+        for (int i = 1; i <= sq; ++i)
+        {
+            small[i] = i -1;
+            large[i] = (n/i) - 1;
+        }
+
+        // core lucy hedgehog DP mathematics
+        for (int p = 2; p<=sq; ++p)
+        {
+            // if count has not changed from p-1 , p was crossed out. It's composite
+            if (small[p] == small[p-1]) continue;
+
+            int pc = small[p-1]; // primes counted strictly before p
+            long long q = (long long)p * p;
+            int end_i = std::min((long long)sq, n/q);
+
+            // Branchless loop split
+            // Instead of putting an `if (i*p <= sq)` inside loop, we calc the maths border beforehand
+            // and split it into two independent loops
+            int border = sq/p;
+            int limit1 = std::min(end_i, border);
+
+            // Loop 1 : conditions wehere (i*p) <= sq
+            for (int i = 1; i<=limit1; ++i) large[i] -= large[i*p] - pc;
+            // Loop 2 : conditions where (i*p) > sq
+            for (int i = limit1+1; i<=end_i; ++i)
+            {
+                int w = (n/i) / p;
+                large[i] -= small[w] - pc;
+            }
+
+            // update the small array
+            // we loop backwards strictly because we need the data from the p-1 iteration
+            for (int i = sq; i >= q; --i) small[i] -= small[i/p] - pc;
+        }
+
+        // large[1] tracks the number of primes <= n /1 , which means all primes!
+        return large[1];
+
+
+    }
+};
+
+// achives 2 ms !
+class SolutionLC_cpp23_obfus {
+public:
+    static int countPrimes(int n) {
+        if(n <= 2) return 0;
+        n = n - 1;
+        const int sq = std::sqrt(n);
+        std::vector<int> small(sq+1), large(sq+1);
+        for(int i = 1; i <= sq; ++i) { small[i] = i - 1; large[i] = (n/i) - 1; }
+        for(int p = 2; p <= sq; ++p) {
+            if (small[p] == small[p-1]) continue;
+            long long q = (long long)p*p;
+            int pc = small[p-1], end_i = std::min((long long)sq, n/q);
+            int border = sq/p, limit1 = std::min(end_i, border);
+            for(int i = 1; i <= limit1; ++i) large[i] -= large[i*p] - pc;
+            for(int i = limit1+1; i <= end_i; ++i)
+            { int w = (n/i)/p; large[i] -= small[w] - pc; }
+            for(int i = sq; i >= q; --i) small[i] -= small[i/p] - pc;
+        }
+        return large[1];
+    }
+};
+
+// The Absolute Limit (0ms - 1ms on LC)
+#pragma GCC optimize("O3,unroll-loops")
+#pragma GCC target("avx2,bmi,bmi2,lzcnt,popcnt")
+
+class SolutionLC_cpp23_Ultimate {
+public:
+    static int countPrimes(int n) {
+        if (n <= 2) return 0;
+        n -= 1;
+        
+        int sq = std::sqrt(n);
+        
+        static int small[45000];
+        static int large[45000];
+        static int n_div[45000]; 
+        
+        for (int i = 1; i <= sq; ++i) {
+            n_div[i] = n / i;                     
+            small[i] = (i - 1) / 2;               
+            large[i] = (n_div[i] - 1) / 2;
+        }
+        
+        for (int p = 3; p <= sq; p += 2) {
+            if (small[p] == small[p - 1]) continue;
+            
+            int pc = small[p - 1]; 
+            long long q = (long long)p * p;
+            
+            int end_i = std::min((long long)sq, n / q);
+            int border = sq / p;
+            int limit1 = std::min(end_i, border);
+            
+            for (int i = 1; i <= limit1; ++i) {
+                large[i] -= large[i * p] - pc;
+            }
+            
+            for (int i = limit1 + 1; i <= end_i; ++i) {
+                int w = n_div[i] / p;
+                large[i] -= small[w] - pc;
+            }
+            
+            for (int i = sq; i >= q; --i) {
+                small[i] -= small[i / p] - pc;
+            }
+        }
+        
+        return large[1] + 1;
+    }
+};
 
 int main()
 {
-    // Example
-    // n =      10, 0, 1
-    // Output =  4, 0, 0
-    const std::vector<int> n = {10,0,1};
-    std::ranges::for_each(n, [](const int x)
-    {
-        std::cout<<"n: " <<x<<"; "<<"BruteforceCPP17: "<< Solution::count_primes_bruteforce_cpp17(x) << std::endl;
-        std::cout<<"n: " <<x<<"; "<<"BruteforceCPP20: "<< Solution::count_primes_bruteforce_cpp20(x) << std::endl;
-        std::cout<<"n: " <<x<<"; "<<"OptimisedCPP17: "<< Solution::count_primes_optimised_cpp17(x) << std::endl;
-        std::cout<<"n: " <<x<<"; "<<"OptimisedCPP20: "<< Solution::count_primes_optimised_cpp20(x) << std::endl;
-        std::cout << "---------" << std::endl;
-    });
-
-    // const int p = 50000000;
-    // std::cout << p << std::endl;
-    // std::cout << Solution::count_primes_optimised_cpp17(p) << std::endl;
-    // constexpr int ans = Solution::count_primes_optimised_cpp20(p);
-    // std::cout << ans << std::endl;
-
     long long l = 500000000ll;
-    constexpr int li = 500000000;
     int li2 = 500000000;
 
-    cout<< SolutionLC::count_primes(l)<<endl;
-    cout<<li<<endl;
-    const int sol = Solution::count_primes_optimised_cpp20(li);
-    cout<<sol<<endl;
-    cout<<li2<<endl;
-    cout << Solution::count_primes_optimised_cpp17(li2)<<endl;
+    std::cout<<"n = "<<li2<<": \n";
+    std::cout<<"SolutionLC: "<<SolutionLC::count_primes(l)<<"\n";
+    std::cout<<"LC_cpp23: "<<SolutionLC_cpp23::countPrimes(li2)<<"\n";
+    std::cout<<"LC_cpp23_obfus: "<<SolutionLC_cpp23_obfus::countPrimes(li2)<<"\n";
+    std::cout<<"LC_cpp23_Ultimate: "<<SolutionLC_cpp23_Ultimate::countPrimes(li2)<<"\n";
 }
